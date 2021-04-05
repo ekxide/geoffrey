@@ -1,0 +1,25 @@
+mod doc;
+mod error;
+mod logging;
+mod params;
+
+use anyhow::{Context, Result};
+use structopt::StructOpt;
+
+fn main() -> Result<()> {
+    logging::try_init("trace").context("failed to initialize logger")?;
+
+    let params = params::Params::from_args();
+
+    let absolute_doc_path = if params.doc_path.is_relative() {
+        std::env::current_dir()?.join(params.doc_path)
+    } else {
+        params.doc_path
+    };
+
+    let documents = doc::Documents::new(absolute_doc_path)?;
+
+    log::info!("documents: {:#?}", documents);
+
+    Ok(())
+}

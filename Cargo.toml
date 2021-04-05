@@ -1,0 +1,19 @@
+[package]
+name = "geoffrey"
+version = "0.1.0"
+authors = ["Mathias »Bob« Kraus <k.hias@gmx.de>"]
+edition = "2018"
+license = "Apache-2.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0"
+flexi_logger = "0.17"
+log = "0.4"
+structopt = "0.3"
+thiserror = "1.0"
+yansi = "0.5"
+
+[dev-dependencies]
+tempfile = "3"
