@@ -104,6 +104,7 @@ dependencies = [
  "anyhow",
  "flexi_logger",
  "log",
+ "regex",
  "structopt",
  "tempfile",
  "thiserror",

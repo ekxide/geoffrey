@@ -1,4 +1,4 @@
-mod doc;
+mod documents;
 mod error;
 mod logging;
 mod params;
@@ -17,9 +17,9 @@ fn main() -> Result<()> {
         params.doc_path
     };
 
-    let documents = doc::Documents::new(absolute_doc_path)?;
-
-    log::info!("documents: {:#?}", documents);
+    let mut documents = documents::Documents::new(absolute_doc_path)?;
+    documents.parse()?;
+    documents.sync()?;
 
     Ok(())
 }
