@@ -2,7 +2,7 @@
 
 All glory Hypnotoad!
 
-<!-- [geoffrey] [testdata/content/dummy.hpp] [the question] -->
+<!-- [geoffrey] [testdata/content/dummy.hpp] [[the question] [response]] -->
 ```c++
 uint8_t answerToTheUniverseAndEverything() {
 //! [the answer]
@@ -21,7 +21,8 @@ constexpr uint8_t ANSWER{42U};
 ```
 
 
-<!-- [geoffrey] [testdata/content/goat.txt] [] -->
+Entire files can be embedded
+<!-- [geoffrey] [testdata/content/goat.txt] -->
 ```
   -^-_-^-_-^-_-^-_-^-_-^-
  (                       )
@@ -38,7 +39,7 @@ constexpr uint8_t ANSWER{42U};
 ```
 
 
-A fixed code block
+A manually managed code block
 ```c++
 auto foo = "bar";
 ```

@@ -37,9 +37,16 @@ impl ContentFile {
 }
 
 #[derive(Debug)]
+enum MdSnippetTag {
+    FullFile,
+    FullSnippet { main: String },
+    ElidedSnippet { main: String, sub: Vec<String> },
+}
+
+#[derive(Debug)]
 struct MdSnippetId {
     path: String,
-    tag: String,
+    tag: MdSnippetTag,
 }
 
 #[derive(Debug)]
@@ -118,7 +125,7 @@ impl Documents {
     }
 
     pub fn parse(&mut self) -> Result<(), GeoffreyError> {
-        // parse the md files
+        log::info!("#### parse md files for tags");
         let content = Mutex::new(&mut self.content);
         self.md_files
             .par_iter_mut()
@@ -128,7 +135,7 @@ impl Documents {
             })
             .collect::<Result<(), GeoffreyError>>()?;
 
-        // parse the content files
+        log::info!("#### parse content files for tags");
         let git_toplevel = &self.git_toplevel;
         self.content
             .par_iter_mut()
@@ -147,6 +154,7 @@ impl Documents {
     }
 
     pub fn sync(self) -> Result<(), GeoffreyError> {
+        log::info!("#### sync md files with content");
         self.md_files
             .par_iter()
             .map(|md_file| {
@@ -159,7 +167,13 @@ impl Documents {
                             GeoffreyError::ContentFileNotFound(snippet_id.path.to_owned()),
                         )?;
 
-                        if let Some(snip_desc) = content_cache.lookup.get(&snippet_id.tag) {
+                        let tag = match &snippet_id.tag {
+                            MdSnippetTag::FullFile => "",
+                            MdSnippetTag::FullSnippet { main } => &main,
+                            MdSnippetTag::ElidedSnippet { main, .. } => &main,
+                        };
+
+                        if let Some(snip_desc) = content_cache.lookup.get(tag) {
                             let snippet = if snip_desc.tag.is_empty() {
                                 &content_cache.data[..]
                             } else {
@@ -175,7 +189,7 @@ impl Documents {
                         } else {
                             Err(GeoffreyError::ContentSnippetNotFound(
                                 snippet_id.path.to_owned(),
-                                snippet_id.tag.to_owned(),
+                                tag.to_owned(),
                             ))
                         }?;
                     }
@@ -238,8 +252,10 @@ impl Documents {
         let f = fs::File::open(md_file.path.clone())?;
         let mut reader = BufReader::new(f);
 
-        let re_tag = Regex::new(r"^<!-- *\[geoffrey\] *\[([a-zA-Z0-9/._-]*)\] *(\[(.*)\])? *-->")
+        let re_tag = Regex::new(r"^<!-- *\[geoffrey\] *\[([\w\s\.-/]*)\] *(\[(.*)\])? *-->")
             .map_err(|_| GeoffreyError::RegexError)?;
+
+        let re_sub_tag = Regex::new(r"\[([\w\s\.-]*)\]").map_err(|_| GeoffreyError::RegexError)?;
 
         let re_code_block = Regex::new(r"```").map_err(|_| GeoffreyError::RegexError)?;
 
@@ -254,9 +270,38 @@ impl Documents {
             segment.text.push_str(&line);
             if let Some(caps) = re_tag.captures(&line) {
                 let path = caps.get(1).ok_or(GeoffreyError::RegexError)?.as_str();
-                let tag = caps.get(3).map_or("", |matcher| matcher.as_str());
+                let str_tag = caps.get(3).map_or("", |matcher| matcher.as_str().trim());
 
-                log::info!("{:?} '{}' - '{}'", md_file.path, path, tag);
+                log::info!("{:?} '{}' - '{}'", md_file.path, path, str_tag);
+
+                let tag = match str_tag {
+                    "" => MdSnippetTag::FullFile,
+                    _ => {
+                        let mut caps_iter = re_sub_tag.captures_iter(str_tag);
+
+                        if let Some(caps) = caps_iter.next() {
+                            let main = caps
+                                .get(1)
+                                .ok_or(GeoffreyError::RegexError)?
+                                .as_str()
+                                .to_owned();
+                            let sub = caps_iter
+                                .map(|caps| {
+                                    Ok(caps
+                                        .get(1)
+                                        .ok_or(GeoffreyError::RegexError)?
+                                        .as_str()
+                                        .to_owned())
+                                })
+                                .collect::<Result<Vec<String>, GeoffreyError>>()?;
+                            MdSnippetTag::ElidedSnippet { main, sub }
+                        } else {
+                            MdSnippetTag::FullSnippet {
+                                main: str_tag.to_owned(),
+                            }
+                        }
+                    }
+                };
 
                 content
                     .lock()
@@ -264,7 +309,7 @@ impl Documents {
                     .insert(path.to_owned(), ContentFile::new());
                 segment.snippet_id = Some(MdSnippetId {
                     path: path.to_owned(),
-                    tag: tag.to_owned(),
+                    tag,
                 });
 
                 // next line must be the begin of a code block
@@ -275,7 +320,7 @@ impl Documents {
                 } else {
                     Err(GeoffreyError::CodeBlockMustFollowTag(
                         md_file.path.clone(),
-                        tag.to_owned(),
+                        str_tag.to_owned(),
                     ))
                 }?;
 
@@ -300,7 +345,7 @@ impl Documents {
                 if !end_of_block_found {
                     return Err(GeoffreyError::CodeBlockEndMissing(
                         md_file.path.clone(),
-                        tag.to_owned(),
+                        str_tag.to_owned(),
                     ));
                 }
             }
