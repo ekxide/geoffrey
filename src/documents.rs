@@ -286,36 +286,47 @@ impl Documents {
         let file = fs::File::open(path)?;
         let mut reader = BufReader::new(file);
 
-        let re = Regex::new(r" *//! \[(.*)\]").map_err(|_| GeoffreyError::RegexError)?;
+        let re = Regex::new(r"( *)//! \[(.*)\]").map_err(|_| GeoffreyError::RegexError)?;
 
         let mut snippets = Snippets {
             data: HashMap::new(),
         };
 
         let mut current_tag = None;
+        let mut current_snippet = String::new();
+        let mut indentation = String::new();
         let mut line = String::new();
         while reader.read_line(&mut line)? > 0 {
             if let Some(caps) = re.captures(&line) {
                 if current_tag.is_none() {
+                    indentation = caps
+                        .get(1)
+                        .ok_or(GeoffreyError::RegexError)?
+                        .as_str()
+                        .to_owned();
+
                     current_tag = Some(
-                        caps.get(1)
+                        caps.get(2)
                             .ok_or(GeoffreyError::RegexError)?
                             .as_str()
                             .to_owned(),
                     );
                     line.clear();
+                    continue;
                 } else {
+                    snippets
+                        .data
+                        .insert(current_tag.unwrap().clone(), current_snippet);
+                    current_snippet = String::new();
                     current_tag = None;
                 }
             }
 
-            if current_tag.is_none() {
-                line.clear()
-            };
+            if current_tag.is_some() {
+                current_snippet.push_str(line.strip_prefix(&indentation).unwrap_or(&line));
+            }
 
-            current_tag
-                .as_ref()
-                .map(|tag| snippets.data.insert(tag.clone(), line.clone()));
+            line.clear()
         }
 
         Ok(snippets)
