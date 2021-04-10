@@ -16,14 +16,18 @@ pub enum GeoffreyError {
     GitToplevelError,
     #[error("Regex error")]
     RegexError,
-    #[error("The content file '{1}' referenced in the markdown file '{0}' was not found")]
-    ContentFileNotFound(PathBuf, String),
+    #[error("The content file '{0}' was not found")]
+    ContentFileNotFound(String),
     #[error("The content snippet '{1}' not found in the content file '{0}' was not found")]
     ContentSnippetNotFound(String, String),
     #[error(
-        "The code block must immediately follow the geoffrey tag '{1}' in the markdown file '{0}'"
+        "The code block must immediately follow the geoffrey snippet tag '{1}' in the markdown file '{0}'"
     )]
-    CodeBlockFustFollowTag(PathBuf, String),
+    CodeBlockMustFollowTag(PathBuf, String),
+    #[error(
+        "The end of the code block of snippet tag '{1}' in the markdown file '{0}' is not present"
+    )]
+    CodeBlockEndMissing(PathBuf, String),
     #[error("Error accessing file")]
     IoError(#[from] std::io::Error),
 }

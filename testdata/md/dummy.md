@@ -25,6 +25,7 @@ uint8_t answer{42U};
 ```
 
 
-foo
-```
+A fixed code block
+```c++
+auto foo = "bar";
 ```
