@@ -320,10 +320,15 @@ impl Documents {
                                 }
                             };
 
+                            let re = Regex::new(r"( *)//! \[(.*)\]")
+                                .map_err(|_| GeoffreyError::RegexError)?;
                             for line in snippet {
-                                synced_file.push_str(
-                                    line.strip_prefix(&snip_desc.indentation).unwrap_or(&line),
-                                );
+                                // skip tag lines
+                                if !re.is_match(line) {
+                                    synced_file.push_str(
+                                        line.strip_prefix(&snip_desc.indentation).unwrap_or(&line),
+                                    );
+                                }
                             }
                             Ok(())
                         } else {

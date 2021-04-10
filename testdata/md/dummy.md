@@ -6,9 +6,7 @@ All glory Hypnotoad!
 ```c++
 uint8_t answerToTheUniverseAndEverything() {
     // ...
-    //! [response]
     return ANSWER;
-    //! [response]
 }
 ```
 
