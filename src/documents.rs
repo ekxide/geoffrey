@@ -43,10 +43,18 @@ impl Documents {
             return Err(GeoffreyError::DocPathDoesNotExist(doc_path));
         }
 
+        let doc_dir = if doc_path.is_dir() {
+            doc_path.clone()
+        } else {
+            doc_path
+                .parent()
+                .ok_or(GeoffreyError::GitToplevelError)?
+                .to_path_buf()
+        };
         let git_toplevel = std::process::Command::new("git")
             .arg("rev-parse")
             .arg("--show-toplevel")
-            .current_dir(doc_path.clone())
+            .current_dir(doc_dir)
             .output()
             .map_err(|_| GeoffreyError::GitToplevelError)?;
 
