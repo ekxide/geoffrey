@@ -1,11 +1,13 @@
 use crate::error::GeoffreyError;
 
+use rayon::prelude::*;
 use regex::Regex;
 
 use std::collections::HashMap;
 use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
+use std::sync::Mutex;
 use std::vec::Vec;
 
 type Tag = String;
@@ -31,7 +33,6 @@ struct MdSegment {
 #[derive(Debug)]
 struct MdFile {
     path: PathBuf,
-    synced_file: String,
     segments: Vec<MdSegment>,
 }
 
@@ -39,7 +40,6 @@ impl MdFile {
     fn new(path: PathBuf) -> Self {
         Self {
             path,
-            synced_file: String::new(),
             segments: Vec::new(),
         }
     }
@@ -101,59 +101,70 @@ impl Documents {
 
     pub fn parse(&mut self) -> Result<(), GeoffreyError> {
         // parse the md files
-        for md_file in self.md_files.iter_mut() {
-            Self::parse_single_md_file(md_file, &mut self.content)?;
-        }
+        let content = Mutex::new(&mut self.content);
+        self.md_files
+            .par_iter_mut()
+            .map(|md_file| {
+                Self::parse_single_md_file(md_file, &content)?;
+                Ok(())
+            })
+            .collect::<Result<(), GeoffreyError>>()?;
 
         // parse the content files
-        for (path, snippets) in self.content.iter_mut() {
-            let absolute_path = self.git_toplevel.join(path);
-            if !absolute_path.exists() {
-                return Err(GeoffreyError::ContentFileNotFound(path.to_owned()));
-            }
-            *snippets = Self::parse_content_file(&absolute_path)?;
-        }
+        let git_toplevel = &self.git_toplevel;
+        self.content
+            .par_iter_mut()
+            .map(|(path, snippets)| {
+                let absolute_path = git_toplevel.join(path);
+                if !absolute_path.exists() {
+                    return Err(GeoffreyError::ContentFileNotFound(path.to_owned()));
+                }
+                *snippets = Self::parse_content_file(&absolute_path)?;
+                Ok(())
+            })
+            .collect::<Result<(), GeoffreyError>>()?;
 
         Ok(())
     }
 
-    pub fn sync(&mut self) -> Result<(), GeoffreyError> {
-        // create synced data
-        for md_file in self.md_files.iter_mut() {
-            let synced_file = &mut md_file.synced_file;
-            for segment in md_file.segments.iter() {
-                synced_file.push_str(&segment.text);
-                if let Some(snippet_id) = &segment.snippet_id {
-                    let snippets_cache = self.content.get(&snippet_id.path).ok_or(
-                        GeoffreyError::ContentFileNotFound(snippet_id.path.to_owned()),
-                    )?;
+    pub fn sync(self) -> Result<(), GeoffreyError> {
+        self.md_files
+            .par_iter()
+            .map(|md_file| {
+                // create synced data
+                let mut synced_file = String::new();
+                for segment in md_file.segments.iter() {
+                    synced_file.push_str(&segment.text);
+                    if let Some(snippet_id) = &segment.snippet_id {
+                        let snippets_cache = self.content.get(&snippet_id.path).ok_or(
+                            GeoffreyError::ContentFileNotFound(snippet_id.path.to_owned()),
+                        )?;
 
-                    if let Some(snippet) = snippets_cache.data.get(&snippet_id.tag) {
-                        synced_file.push_str(snippet);
-                        Ok(())
-                    } else {
-                        Err(GeoffreyError::ContentSnippetNotFound(
-                            snippet_id.path.to_owned(),
-                            snippet_id.tag.to_owned(),
-                        ))
-                    }?;
+                        if let Some(snippet) = snippets_cache.data.get(&snippet_id.tag) {
+                            synced_file.push_str(snippet);
+                            Ok(())
+                        } else {
+                            Err(GeoffreyError::ContentSnippetNotFound(
+                                snippet_id.path.to_owned(),
+                                snippet_id.tag.to_owned(),
+                            ))
+                        }?;
+                    }
                 }
-            }
-        }
 
-        // sync to file
-        for md_file in self.md_files.iter() {
-            let mut file = OpenOptions::new()
-                .write(true)
-                .create(false)
-                .truncate(true)
-                .open(md_file.path.clone())?;
+                // sync to file
+                let mut file = OpenOptions::new()
+                    .write(true)
+                    .create(false)
+                    .truncate(true)
+                    .open(md_file.path.clone())?;
 
-            file.write_all(md_file.synced_file.as_bytes())?;
-            file.sync_all()?
-        }
+                file.write_all(synced_file.as_bytes())?;
+                file.sync_all()?;
 
-        Ok(())
+                Ok(())
+            })
+            .collect::<Result<(), GeoffreyError>>()
     }
 
     fn find_md_files(
@@ -193,7 +204,7 @@ impl Documents {
 
     fn parse_single_md_file(
         md_file: &mut MdFile,
-        content: &mut ContentMap,
+        content: &Mutex<&mut ContentMap>,
     ) -> Result<(), GeoffreyError> {
         let f = fs::File::open(md_file.path.clone())?;
         let mut reader = BufReader::new(f);
@@ -218,7 +229,7 @@ impl Documents {
 
                 log::info!("{:?} '{}' - '{}'", md_file.path, path, tag);
 
-                content.insert(
+                content.lock().expect("could not lock mutex").insert(
                     path.to_owned(),
                     Snippets {
                         data: HashMap::new(),
