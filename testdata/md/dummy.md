@@ -2,13 +2,26 @@
 
 All glory Hypnotoad!
 
+<!-- [geoffrey] [testdata/content/dummy.hpp] [the question] -->
+```c++
+uint8_t answerToTheUniverseAndEverything() {
+//! [the answer]
+constexpr uint8_t ANSWER{42U};
+//! [the answer]
+
+//! [response]
+return ANSWER;
+//! [response]
+}
+```
+
 <!-- [geoffrey] [testdata/content/dummy.hpp] [the answer] -->
 ```c++
-uint8_t answer{42U};
+constexpr uint8_t ANSWER{42U};
 ```
 
 
-<!-- [geoffrey] [testdata/content/goat.txt] [thinking] -->
+<!-- [geoffrey] [testdata/content/goat.txt] [] -->
 ```
   -^-_-^-_-^-_-^-_-^-_-^-
  (                       )

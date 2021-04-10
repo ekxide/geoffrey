@@ -18,8 +18,14 @@ pub enum GeoffreyError {
     RegexError,
     #[error("The content file '{0}' was not found")]
     ContentFileNotFound(String),
-    #[error("The content snippet '{1}' not found in the content file '{0}' was not found")]
+    #[error("The content snippet '{1}' in the content file '{0}' was not found")]
     ContentSnippetNotFound(String, String),
+    #[error("End tag '{1}' in content file '{0}' not found")]
+    ContentSnippetEndTagNotFound(PathBuf, String),
+    #[error("Empty tag detected in content file '{0}'")]
+    ContentSnippetEmptyTag(PathBuf),
+    #[error("Double tag '{1}' in content file '{0}' detected")]
+    ContentSnippetDoubleTag(PathBuf, String),
     #[error(
         "The code block must immediately follow the geoffrey snippet tag '{1}' in the markdown file '{0}'"
     )]

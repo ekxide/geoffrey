@@ -11,11 +11,29 @@ use std::sync::Mutex;
 use std::vec::Vec;
 
 type Tag = String;
-type Content = String;
+
+#[derive(Debug, Clone)]
+struct ContentSnippetDescription {
+    tag: String,
+    indentation: String,
+    begin: usize,
+    end: usize,
+    nested: Vec<ContentSnippetDescription>,
+}
 
 #[derive(Debug)]
-pub struct Snippets {
-    data: HashMap<Tag, Content>,
+struct ContentFile {
+    data: Vec<String>,
+    lookup: HashMap<Tag, ContentSnippetDescription>,
+}
+
+impl ContentFile {
+    fn new() -> Self {
+        ContentFile {
+            data: Vec::new(),
+            lookup: HashMap::new(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -45,7 +63,7 @@ impl MdFile {
     }
 }
 
-type ContentMap = HashMap<String, Snippets>;
+type ContentMap = HashMap<String, ContentFile>;
 
 #[derive(Debug)]
 pub struct Documents {
@@ -95,7 +113,7 @@ impl Documents {
         Ok(Self {
             git_toplevel,
             md_files,
-            content: HashMap::new(),
+            content: ContentMap::new(),
         })
     }
 
@@ -114,12 +132,13 @@ impl Documents {
         let git_toplevel = &self.git_toplevel;
         self.content
             .par_iter_mut()
-            .map(|(path, snippets)| {
+            .map(|(path, content_file)| {
                 let absolute_path = git_toplevel.join(path);
                 if !absolute_path.exists() {
                     return Err(GeoffreyError::ContentFileNotFound(path.to_owned()));
                 }
-                *snippets = Self::parse_content_file(&absolute_path)?;
+                *content_file = Self::parse_content_file(&absolute_path)?;
+
                 Ok(())
             })
             .collect::<Result<(), GeoffreyError>>()?;
@@ -136,12 +155,22 @@ impl Documents {
                 for segment in md_file.segments.iter() {
                     synced_file.push_str(&segment.text);
                     if let Some(snippet_id) = &segment.snippet_id {
-                        let snippets_cache = self.content.get(&snippet_id.path).ok_or(
+                        let content_cache = self.content.get(&snippet_id.path).ok_or(
                             GeoffreyError::ContentFileNotFound(snippet_id.path.to_owned()),
                         )?;
 
-                        if let Some(snippet) = snippets_cache.data.get(&snippet_id.tag) {
-                            synced_file.push_str(snippet);
+                        if let Some(snip_desc) = content_cache.lookup.get(&snippet_id.tag) {
+                            let snippet = if snip_desc.tag.is_empty() {
+                                &content_cache.data[..]
+                            } else {
+                                &content_cache.data
+                                    [snip_desc.end.min(snip_desc.begin + 1)..snip_desc.end]
+                            };
+                            for line in snippet {
+                                synced_file.push_str(
+                                    line.strip_prefix(&snip_desc.indentation).unwrap_or(&line),
+                                );
+                            }
                             Ok(())
                         } else {
                             Err(GeoffreyError::ContentSnippetNotFound(
@@ -229,12 +258,10 @@ impl Documents {
 
                 log::info!("{:?} '{}' - '{}'", md_file.path, path, tag);
 
-                content.lock().expect("could not lock mutex").insert(
-                    path.to_owned(),
-                    Snippets {
-                        data: HashMap::new(),
-                    },
-                );
+                content
+                    .lock()
+                    .expect("could not lock mutex")
+                    .insert(path.to_owned(), ContentFile::new());
                 segment.snippet_id = Some(MdSnippetId {
                     path: path.to_owned(),
                     tag: tag.to_owned(),
@@ -282,54 +309,118 @@ impl Documents {
         Ok(())
     }
 
-    fn parse_content_file(path: &PathBuf) -> Result<Snippets, GeoffreyError> {
+    fn parse_content_file(path: &PathBuf) -> Result<ContentFile, GeoffreyError> {
         let file = fs::File::open(path)?;
         let mut reader = BufReader::new(file);
 
-        let re = Regex::new(r"( *)//! \[(.*)\]").map_err(|_| GeoffreyError::RegexError)?;
+        let mut content_file = ContentFile::new();
 
-        let mut snippets = Snippets {
-            data: HashMap::new(),
+        let content_snippet = ContentSnippetDescription {
+            tag: String::new(),
+            indentation: String::new(),
+            begin: 0,
+            end: 0,
+            nested: Vec::new(),
         };
 
-        let mut current_tag = None;
-        let mut current_snippet = String::new();
-        let mut indentation = String::new();
-        let mut line = String::new();
-        while reader.read_line(&mut line)? > 0 {
-            if let Some(caps) = re.captures(&line) {
-                if current_tag.is_none() {
-                    indentation = caps
-                        .get(1)
-                        .ok_or(GeoffreyError::RegexError)?
-                        .as_str()
-                        .to_owned();
+        let root_content_snippet = Self::parse_next_content_snippet(
+            &path,
+            &mut reader,
+            &mut content_file,
+            content_snippet,
+        )?;
 
-                    current_tag = Some(
-                        caps.get(2)
-                            .ok_or(GeoffreyError::RegexError)?
-                            .as_str()
-                            .to_owned(),
-                    );
-                    line.clear();
-                    continue;
-                } else {
-                    snippets
-                        .data
-                        .insert(current_tag.unwrap().clone(), current_snippet);
-                    current_snippet = String::new();
-                    current_tag = None;
-                }
-            }
-
-            if current_tag.is_some() {
-                current_snippet.push_str(line.strip_prefix(&indentation).unwrap_or(&line));
-            }
-
-            line.clear()
+        if content_file
+            .lookup
+            .insert(root_content_snippet.tag.clone(), root_content_snippet)
+            .is_some()
+        {
+            return Err(GeoffreyError::ContentSnippetDoubleTag(
+                path.clone(),
+                "".to_owned(),
+            ))?;
         }
 
-        Ok(snippets)
+        Ok(content_file)
+    }
+
+    fn parse_next_content_snippet<R>(
+        path: &PathBuf,
+        reader: &mut BufReader<R>,
+        content_file: &mut ContentFile,
+        mut current_snippet: ContentSnippetDescription,
+    ) -> Result<ContentSnippetDescription, GeoffreyError>
+    where
+        R: std::io::Read,
+    {
+        let re = Regex::new(r"( *)//! \[(.*)\]").map_err(|_| GeoffreyError::RegexError)?;
+
+        let mut line = String::new();
+        loop {
+            if reader.read_line(&mut line)? > 0 {
+                if let Some(caps) = re.captures(&line) {
+                    let new_tag = caps.get(2).ok_or(GeoffreyError::RegexError)?.as_str();
+
+                    if current_snippet.tag == new_tag {
+                        current_snippet.end = content_file.data.len();
+                        content_file.data.push(line);
+                        break Ok(current_snippet);
+                    } else if new_tag.len() == 0 {
+                        break Err(GeoffreyError::ContentSnippetEmptyTag(path.clone()));
+                    } else {
+                        let indentation = caps
+                            .get(1)
+                            .ok_or(GeoffreyError::RegexError)?
+                            .as_str()
+                            .to_owned();
+
+                        let new_snippet = ContentSnippetDescription {
+                            tag: new_tag.to_owned(),
+                            indentation,
+                            begin: content_file.data.len(),
+                            end: 0,
+                            nested: Vec::new(),
+                        };
+
+                        content_file.data.push(line);
+                        line = String::new();
+
+                        let nested_snippet = Self::parse_next_content_snippet(
+                            &path,
+                            reader,
+                            content_file,
+                            new_snippet,
+                        )?;
+
+                        if content_file
+                            .lookup
+                            .insert(nested_snippet.tag.clone(), nested_snippet.clone())
+                            .is_some()
+                        {
+                            return Err(GeoffreyError::ContentSnippetDoubleTag(
+                                path.clone(),
+                                nested_snippet.tag.clone(),
+                            ))?;
+                        }
+
+                        current_snippet.nested.push(nested_snippet);
+                    }
+                } else {
+                    content_file.data.push(line);
+                    line = String::new();
+                }
+            } else {
+                if current_snippet.tag == line {
+                    current_snippet.end = content_file.data.len().max(1) - 1;
+                    break Ok(current_snippet);
+                } else {
+                    break Err(GeoffreyError::ContentSnippetEndTagNotFound(
+                        path.clone(),
+                        current_snippet.tag,
+                    ));
+                }
+            }
+        }
     }
 }
 

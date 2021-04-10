@@ -1,7 +1,7 @@
 # It also works recursively
 
 What a goat thinks
-<!-- [geoffrey] [testdata/content/goat.txt] [thinking] -->
+<!-- [geoffrey] [testdata/content/goat.txt] [] -->
 ```
   -^-_-^-_-^-_-^-_-^-_-^-
  (                       )
