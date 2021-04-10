@@ -153,6 +153,42 @@ impl Documents {
         Ok(())
     }
 
+    fn has_elided_lines(
+        tags: &Vec<&str>,
+        elided_lines: &mut Vec<usize>,
+        snip_desc: &ContentSnippetDescription,
+    ) -> bool {
+        let current_snippet_tag = &snip_desc.tag as &str;
+        let mut keep_this = tags.contains(&current_snippet_tag);
+        let keep_nested = snip_desc
+            .nested
+            .iter()
+            .map(|snip_desc| {
+                let keep = Self::has_elided_lines(tags, elided_lines, snip_desc);
+                keep_this |= keep;
+                keep
+            })
+            .collect::<Vec<bool>>();
+
+        if keep_this {
+            keep_nested
+                .iter()
+                .zip(snip_desc.nested.iter())
+                .for_each(|(keep, snip_desc)| {
+                    if !keep {
+                        elided_lines.extend_from_slice(
+                            &(snip_desc.begin..=snip_desc.end)
+                                .into_iter()
+                                .map(|x| x)
+                                .collect::<Vec<usize>>(),
+                        )
+                    }
+                });
+        }
+
+        keep_this
+    }
+
     pub fn sync(self) -> Result<(), GeoffreyError> {
         log::info!("#### sync md files with content");
         self.md_files
@@ -167,6 +203,10 @@ impl Documents {
                             GeoffreyError::ContentFileNotFound(snippet_id.path.to_owned()),
                         )?;
 
+                        // create a list with all lines to be elided, i.e. all the snippets which are not in the vector of Selective(String, Vec<String>)
+                        // now add the empty lines between the elided list -> this leads to merges of the elided snippets
+                        // build the synced file and add the elision placeholder (with correct indentation) in place of the elided text
+
                         let tag = match &snippet_id.tag {
                             MdSnippetTag::FullFile => "",
                             MdSnippetTag::FullSnippet { main } => &main,
@@ -174,12 +214,91 @@ impl Documents {
                         };
 
                         if let Some(snip_desc) = content_cache.lookup.get(tag) {
-                            let snippet = if snip_desc.tag.is_empty() {
-                                &content_cache.data[..]
-                            } else {
-                                &content_cache.data
+                            let mut elided_lines = Vec::new();
+                            if let MdSnippetTag::ElidedSnippet { main, sub } = &snippet_id.tag {
+                                let mut all_tags = Vec::<&str>::new();
+                                all_tags.push(main);
+                                sub.into_iter().for_each(|tag| all_tags.push(tag));
+
+                                Self::has_elided_lines(&all_tags, &mut elided_lines, &snip_desc);
+                                elided_lines.sort();
+
+                                let mut empty_lines = Vec::new();
+                                let mut potentially_remove = Vec::new();
+                                let mut extend_empty_on_next_non_empty = false;
+
+                                let mut current_line = snip_desc.end.min(snip_desc.begin + 1);
+                                for elided in &elided_lines {
+                                    while *elided > current_line {
+                                        let trimmed = content_cache.data[current_line].trim();
+                                        if trimmed.is_empty() {
+                                            potentially_remove.push(current_line);
+                                        } else {
+                                            if extend_empty_on_next_non_empty {
+                                                empty_lines.extend_from_slice(&potentially_remove);
+                                            }
+                                            extend_empty_on_next_non_empty = false;
+                                            potentially_remove.clear();
+                                        }
+                                        current_line += 1;
+                                    }
+                                    empty_lines.extend_from_slice(&potentially_remove);
+                                    potentially_remove.clear();
+                                    extend_empty_on_next_non_empty = true;
+                                    current_line += 1;
+                                }
+                                while snip_desc.end > current_line {
+                                    let trimmed = content_cache.data[current_line].trim();
+                                    if trimmed.is_empty() {
+                                        potentially_remove.push(current_line);
+                                    } else {
+                                        empty_lines.extend_from_slice(&potentially_remove);
+                                        potentially_remove.clear();
+                                        break;
+                                    }
+                                    current_line += 1;
+                                }
+                                empty_lines.extend_from_slice(&potentially_remove);
+                                potentially_remove.clear();
+
+                                elided_lines.extend_from_slice(&empty_lines);
+                                elided_lines.sort();
+                            }
+
+                            for line in (&elided_lines).into_iter() {
+                                println!("#### {}", content_cache.data[*line].trim());
+                            }
+
+                            let snippet = match &snippet_id.tag {
+                                MdSnippetTag::FullFile => content_cache.data[..]
+                                    .into_iter()
+                                    .map(|line| line as &str)
+                                    .collect::<Vec<&str>>(),
+                                MdSnippetTag::FullSnippet { .. } => content_cache.data
                                     [snip_desc.end.min(snip_desc.begin + 1)..snip_desc.end]
+                                    .into_iter()
+                                    .map(|line| line as &str)
+                                    .collect::<Vec<&str>>(),
+                                MdSnippetTag::ElidedSnippet { .. } => {
+                                    let mut current_line = snip_desc.end.min(snip_desc.begin + 1);
+
+                                    let mut remaining_lines = Vec::<&str>::new();
+
+                                    for elided in &elided_lines {
+                                        while *elided > current_line {
+                                            remaining_lines.push(&content_cache.data[current_line]);
+                                            current_line += 1;
+                                        }
+                                        current_line += 1;
+                                    }
+                                    while snip_desc.end > current_line {
+                                        remaining_lines.push(&content_cache.data[current_line]);
+                                        current_line += 1;
+                                    }
+                                    remaining_lines
+                                }
                             };
+
                             for line in snippet {
                                 synced_file.push_str(
                                     line.strip_prefix(&snip_desc.indentation).unwrap_or(&line),
