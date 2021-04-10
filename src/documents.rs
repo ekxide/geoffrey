@@ -16,6 +16,7 @@ type Tag = String;
 struct ContentSnippetDescription {
     tag: String,
     indentation: String,
+    ellipsis_line: String,
     begin: usize,
     end: usize,
     nested: Vec<ContentSnippetDescription>,
@@ -156,6 +157,7 @@ impl Documents {
     fn has_elided_lines(
         tags: &Vec<&str>,
         elided_lines: &mut Vec<usize>,
+        ellipsis_lines: &mut Vec<(usize, usize, String)>,
         snip_desc: &ContentSnippetDescription,
     ) -> bool {
         let current_snippet_tag = &snip_desc.tag as &str;
@@ -164,7 +166,7 @@ impl Documents {
             .nested
             .iter()
             .map(|snip_desc| {
-                let keep = Self::has_elided_lines(tags, elided_lines, snip_desc);
+                let keep = Self::has_elided_lines(tags, elided_lines, ellipsis_lines, snip_desc);
                 keep_this |= keep;
                 keep
             })
@@ -176,6 +178,11 @@ impl Documents {
                 .zip(snip_desc.nested.iter())
                 .for_each(|(keep, snip_desc)| {
                     if !keep {
+                        ellipsis_lines.push((
+                            snip_desc.begin,
+                            snip_desc.end,
+                            snip_desc.ellipsis_line.clone(),
+                        ));
                         elided_lines.extend_from_slice(
                             &(snip_desc.begin..=snip_desc.end)
                                 .into_iter()
@@ -203,15 +210,13 @@ impl Documents {
                             GeoffreyError::ContentFileNotFound(snippet_id.path.to_owned()),
                         )?;
 
-                        // create a list with all lines to be elided, i.e. all the snippets which are not in the vector of Selective(String, Vec<String>)
-                        // now add the empty lines between the elided list -> this leads to merges of the elided snippets
-                        // build the synced file and add the elision placeholder (with correct indentation) in place of the elided text
-
                         let tag = match &snippet_id.tag {
                             MdSnippetTag::FullFile => "",
                             MdSnippetTag::FullSnippet { main } => &main,
                             MdSnippetTag::ElidedSnippet { main, .. } => &main,
                         };
+
+                        let mut ellipsis_lines = Vec::<(usize, usize, String)>::new();
 
                         if let Some(snip_desc) = content_cache.lookup.get(tag) {
                             let mut elided_lines = Vec::new();
@@ -220,7 +225,12 @@ impl Documents {
                                 all_tags.push(main);
                                 sub.into_iter().for_each(|tag| all_tags.push(tag));
 
-                                Self::has_elided_lines(&all_tags, &mut elided_lines, &snip_desc);
+                                Self::has_elided_lines(
+                                    &all_tags,
+                                    &mut elided_lines,
+                                    &mut ellipsis_lines,
+                                    &snip_desc,
+                                );
                                 elided_lines.sort();
 
                                 let mut empty_lines = Vec::new();
@@ -265,10 +275,6 @@ impl Documents {
                                 elided_lines.sort();
                             }
 
-                            for line in (&elided_lines).into_iter() {
-                                println!("#### {}", content_cache.data[*line].trim());
-                            }
-
                             let snippet = match &snippet_id.tag {
                                 MdSnippetTag::FullFile => content_cache.data[..]
                                     .into_iter()
@@ -283,11 +289,26 @@ impl Documents {
                                     let mut current_line = snip_desc.end.min(snip_desc.begin + 1);
 
                                     let mut remaining_lines = Vec::<&str>::new();
+                                    let mut add_ellipsis_line = true;
 
                                     for elided in &elided_lines {
                                         while *elided > current_line {
                                             remaining_lines.push(&content_cache.data[current_line]);
                                             current_line += 1;
+                                            add_ellipsis_line = true;
+                                        }
+
+                                        if add_ellipsis_line {
+                                            for ellipsis in &ellipsis_lines {
+                                                if current_line >= ellipsis.0
+                                                    || current_line <= ellipsis.1
+                                                {
+                                                    remaining_lines.push(&ellipsis.2);
+                                                    break;
+                                                }
+                                            }
+
+                                            add_ellipsis_line = false;
                                         }
                                         current_line += 1;
                                     }
@@ -482,6 +503,7 @@ impl Documents {
         let content_snippet = ContentSnippetDescription {
             tag: String::new(),
             indentation: String::new(),
+            ellipsis_line: String::new(),
             begin: 0,
             end: 0,
             nested: Vec::new(),
@@ -538,9 +560,12 @@ impl Documents {
                             .as_str()
                             .to_owned();
 
+                        let ellipsis_line = format!("{}// ...\n", indentation);
+
                         let new_snippet = ContentSnippetDescription {
                             tag: new_tag.to_owned(),
                             indentation,
+                            ellipsis_line,
                             begin: content_file.data.len(),
                             end: 0,
                             nested: Vec::new(),

@@ -2,9 +2,10 @@
 
 All glory Hypnotoad!
 
-<!-- [geoffrey] [testdata/content/dummy.hpp] [[the question][response]] -->
+<!-- [geoffrey] [testdata/content/dummy.hpp] [[the question] [response]] -->
 ```c++
 uint8_t answerToTheUniverseAndEverything() {
+    // ...
     //! [response]
     return ANSWER;
     //! [response]
