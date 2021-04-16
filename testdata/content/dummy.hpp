@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef DUMMY_HPP
 #define DUMMY_HPP
 

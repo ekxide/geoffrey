@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 use flexi_logger::{style, DeferredNow, FlexiLoggerError, Logger};
 use yansi::Paint;
 

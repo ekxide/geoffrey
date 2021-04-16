@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 use thiserror::Error;
 
 use std::path::PathBuf;
