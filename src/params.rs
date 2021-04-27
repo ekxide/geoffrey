@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-/// Syncs source code to markdown documentation
+/// Syncs source code to markdown code blocks
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
 pub struct Params {

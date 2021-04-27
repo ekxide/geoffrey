@@ -3,7 +3,7 @@
 All glory Hypnotoad!
 
 <!-- [geoffrey] [testdata/content/dummy.hpp] [[the question] [response]] -->
-```c++
+```cpp
 uint8_t answerToTheUniverseAndEverything() {
     // ...
     return ANSWER;
@@ -11,7 +11,7 @@ uint8_t answerToTheUniverseAndEverything() {
 ```
 
 <!-- [geoffrey] [testdata/content/dummy.hpp] [the answer] -->
-```c++
+```cpp
 constexpr uint8_t ANSWER{42U};
 ```
 
@@ -35,6 +35,64 @@ Entire files can be embedded
 
 
 A manually managed code block
-```c++
+```cpp
 auto foo = "bar";
+```
+
+Let's include the `main.cpp`
+<!-- [geoffrey] [testdata/content/main.cpp] -->
+```cpp
+#include <iostream>
+
+int main() {
+
+    constexpr uint64_t ANSWER {42};
+
+    for(uint64_t i = 0; i < ANSWER; ++i) {
+        std::cout << i << " is not the answer"<< std::endl;
+    }
+
+    std::cout << "it's " << ANSWER << std::endl;
+
+    return EXIT_SUCCESS;
+}
+```
+
+Only the main function
+<!-- [geoffrey] [testdata/content/main.cpp] [main function] -->
+```cpp
+int main() {
+
+    constexpr uint64_t ANSWER {42};
+
+    for(uint64_t i = 0; i < ANSWER; ++i) {
+        std::cout << i << " is not the answer"<< std::endl;
+    }
+
+    std::cout << "it's " << ANSWER << std::endl;
+
+    return EXIT_SUCCESS;
+}
+```
+
+Only the main function with elided nested snippets
+<!-- [geoffrey] [testdata/content/main.cpp] [[main function]] -->
+```cpp
+int main() {
+    // ...
+    return EXIT_SUCCESS;
+}
+```
+
+Only the main function with elided nested snippets
+<!-- [geoffrey] [testdata/content/main.cpp] [[main function] [define answer] [print answer]] -->
+```cpp
+int main() {
+
+    constexpr uint64_t ANSWER {42};
+    // ...
+    std::cout << "it's " << ANSWER << std::endl;
+
+    return EXIT_SUCCESS;
+}
 ```
