@@ -399,10 +399,10 @@ impl Documents {
         let f = fs::File::open(md_file.path.clone())?;
         let mut reader = BufReader::new(f);
 
-        let re_tag = Regex::new(r"^<!-- *\[geoffrey\] *\[([\w\s\.-/]*)\] *(\[(.*)\])? *-->")
+        let re_tag = Regex::new(r"^<!-- *\[geoffrey\] *\[([\w\s\.\-/]*)\] *(\[(.*)\])? *-->")
             .map_err(|_| GeoffreyError::RegexError)?;
 
-        let re_sub_tag = Regex::new(r"\[([\w\s\.-]*)\]").map_err(|_| GeoffreyError::RegexError)?;
+        let re_sub_tag = Regex::new(r"\[([\w\s\.\-]*)\]").map_err(|_| GeoffreyError::RegexError)?;
 
         let re_code_block = Regex::new(r"```").map_err(|_| GeoffreyError::RegexError)?;
 
