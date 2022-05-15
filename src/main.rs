@@ -3,6 +3,7 @@
 mod documents;
 mod error;
 mod logging;
+mod md_parser;
 mod params;
 
 use anyhow::{Context, Result};
@@ -18,6 +19,13 @@ fn main() -> Result<()> {
     } else {
         params.doc_path
     };
+
+    let mut doc = md_parser::Document {
+            content: "# Heading\n  <!--[geoffrey][foo.cpp][bar]--> \n ```cpp\nint main() { return 0 }\n ```\nSome text".into(),
+            has_geoffrey_code_blocks: false,
+            sections: Vec::new(),
+            };
+    doc.sections = md_parser::parse(&doc.content).unwrap();
 
     let mut documents = documents::Documents::new(absolute_doc_path)?;
     documents.parse()?;
