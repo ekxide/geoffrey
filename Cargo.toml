@@ -15,6 +15,7 @@ anyhow = "1.0"
 clap = { version = "4.5", features = ["derive"] }
 flexi_logger = "0.31"
 log = "0.4"
+nom = "8.0"
 rayon = "1.11"
 regex = "1"
 thiserror = "2.0"
