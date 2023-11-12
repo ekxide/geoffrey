@@ -1,9 +1,12 @@
 [package]
 name = "geoffrey"
 version = "0.1.0"
-authors = ["Mathias »Bob« Kraus <k.hias@gmx.de>"]
-edition = "2018"
+authors = ["Mathias Kraus <elboberido@m-hiad.de>"]
+edition = "2021"
 license = "Apache-2.0"
+description = "Syncs source code to markdown code blocks"
+readme = "README.md"
+repository = "https://github.com/ekxide/geoffrey"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
