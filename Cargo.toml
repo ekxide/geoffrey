@@ -17,7 +17,7 @@ log = "0.4"
 rayon = "1.11"
 regex = "1"
 structopt = "0.3"
-thiserror = "1.0"
+thiserror = "2.0"
 yansi = "0.5"
 
 [dev-dependencies]

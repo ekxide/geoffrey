@@ -157,7 +157,7 @@ dependencies = [
  "log",
  "nu-ansi-term",
  "regex",
- "thiserror 2.0.18",
+ "thiserror",
 ]
 
 [[package]]
@@ -171,7 +171,7 @@ dependencies = [
  "regex",
  "structopt",
  "tempfile",
- "thiserror 1.0.24",
+ "thiserror",
  "yansi",
 ]
 
@@ -521,31 +521,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.24"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0f4a65597094d4483ddaed134f409b2cb7c1beccf25201a9f73c719254fa98e"
-dependencies = [
- "thiserror-impl 1.0.24",
-]
-
-[[package]]
-name = "thiserror"
 version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
 dependencies = [
- "thiserror-impl 2.0.18",
-]
-
-[[package]]
-name = "thiserror-impl"
-version = "1.0.24"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7765189610d8241a44529806d6fd1f2e0a08734313a35d5b3a556f92b381f3c0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.68",
+ "thiserror-impl",
 ]
 
 [[package]]
