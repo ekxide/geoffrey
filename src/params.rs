@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::path::PathBuf;
-use structopt::StructOpt;
+use clap::Parser;
 
-/// Syncs source code to markdown code blocks
-#[derive(StructOpt, Debug)]
-#[structopt(rename_all = "kebab-case")]
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None, rename_all = "kebab")]
 pub struct Params {
     /// Path to file or folder with the markdown documentation to sync
-    #[structopt(parse(from_os_str))]
     pub doc_path: PathBuf,
 }

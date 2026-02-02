@@ -6,12 +6,12 @@ mod logging;
 mod params;
 
 use anyhow::{Context, Result};
-use structopt::StructOpt;
+use clap::Parser;
 
 fn main() -> Result<()> {
     logging::try_init("trace").context("failed to initialize logger")?;
 
-    let params = params::Params::from_args();
+    let params = params::Params::parse();
 
     let absolute_doc_path = if params.doc_path.is_relative() {
         std::env::current_dir()?.join(params.doc_path)
