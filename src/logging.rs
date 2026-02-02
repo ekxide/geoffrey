@@ -18,10 +18,12 @@ fn format(
         log::Level::Trace => "[Trace]",
     };
 
+    now.now().format("%Y-%m-%d %H:%M:%S%.3f").fixed(8).dim();
+
     write!(
         w,
         "{} {} {}",
-        Paint::fixed(8, now.now().format("%Y-%m-%d %H:%M:%S%.3f")).dimmed(),
+        now.now().format("%Y-%m-%d %H:%M:%S%.3f").fixed(8).dim(),
         style(level).paint(level_text),
         &record.args()
     )

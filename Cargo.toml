@@ -18,7 +18,7 @@ rayon = "1.11"
 regex = "1"
 structopt = "0.3"
 thiserror = "2.0"
-yansi = "0.5"
+yansi = "1.0"
 
 [dev-dependencies]
 tempfile = "3"
