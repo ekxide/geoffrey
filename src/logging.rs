@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use flexi_logger::{style, DeferredNow, FlexiLoggerError, Logger};
+use flexi_logger::{style, DeferredNow, FlexiLoggerError, Logger, LogSpecification};
 use yansi::Paint;
 
 fn format(
@@ -22,13 +22,13 @@ fn format(
         w,
         "{} {} {}",
         Paint::fixed(8, now.now().format("%Y-%m-%d %H:%M:%S%.3f")).dimmed(),
-        style(level, level_text),
+        style(level).paint(level_text),
         &record.args()
     )
 }
 
 pub fn try_init(log_level: &str) -> Result<(), FlexiLoggerError> {
-    Logger::with_str(log_level)
+    Logger::with(LogSpecification::parse(log_level).unwrap())
         .set_palette("9;11;10;7;8".to_owned())
         .format_for_stderr(format)
         .start()?;

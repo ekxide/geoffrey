@@ -12,7 +12,7 @@ repository = "https://github.com/ekxide/geoffrey"
 
 [dependencies]
 anyhow = "1.0"
-flexi_logger = "0.17"
+flexi_logger = "0.31"
 log = "0.4"
 rayon = "1.5"
 regex = "1"
