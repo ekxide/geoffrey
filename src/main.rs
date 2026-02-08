@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+mod cpp_snippet_parser;
 mod documents;
 mod error;
 mod logging;
